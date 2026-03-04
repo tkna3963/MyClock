@@ -17,11 +17,35 @@
             <input id="TimezoneSearch" type="text" placeholder="検索 / Search..." autocomplete="off">
             <ul id="TimezoneList"></ul>
         </div>
+        <div id="DateView">---</div>
         <div id="TimeView">00:00:00</div>
+    </div>
+
+    <!-- 設定ボタン -->
+    <button id="SettingsButton" title="設定">⚙</button>
+
+    <!-- 設定トレイ -->
+    <div id="SettingsTray">
+        <div id="SettingsTrayHeader">
+            <span id="SettingsTrayTitle">設定</span>
+            <button id="SettingsTrayClose">✕</button>
+        </div>
+        <div id="SettingsTrayContent">
+            <span><input id="DateViewSetting" type="checkbox">日付を表示</span>
+        </div>
     </div>
 
     <script src="WoldClockGlobe.js"></script>
     <script src="WoldClock.js"></script>
+    <script>
+        // 設定トレイの開閉
+        document.getElementById("SettingsButton").addEventListener("click", () => {
+            document.getElementById("SettingsTray").classList.toggle("open");
+        });
+        document.getElementById("SettingsTrayClose").addEventListener("click", () => {
+            document.getElementById("SettingsTray").classList.remove("open");
+        });
+    </script>
 </body>
 
 </html>

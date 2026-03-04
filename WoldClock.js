@@ -117,28 +117,37 @@ function toggleDropdown() {
 // ─────────────────────────────────────────
 // デバイス現在時刻取得
 // ─────────────────────────────────────────
+// ─────────────────────────────────────────
 function GetDeviceNowTime() {
     const rawNow = new Date();
     const offset = BaseInfoList.NTPNowTimeOffset || 0;
     const now = new Date(rawNow.getTime() + offset);
 
-    // 選択中のタイムゾーンで各フィールドを取得
     const tz = BaseInfoList.TimeZone || "UTC";
-    const fmt = (field, opts) =>
-        new Intl.DateTimeFormat("en-US", { timeZone: tz, ...opts })
-            .format(now);
+    const locale = BaseInfoList.TimeZoneInfo?.locale;
 
-    const year    = fmt("year",    { year: "numeric" });
-    const month   = String(now.toLocaleString("en-US", { timeZone: tz, month: "numeric" })).padStart(2, "0");
-    const day     = String(now.toLocaleString("en-US", { timeZone: tz, day: "numeric" })).padStart(2, "0");
-    const hours   = String(now.toLocaleString("en-US", { timeZone: tz, hour: "numeric", hour12: false })).padStart(2, "0");
-    const minutes = String(now.toLocaleString("en-US", { timeZone: tz, minute: "numeric" })).padStart(2, "0");
-    const seconds = String(now.toLocaleString("en-US", { timeZone: tz, second: "numeric" })).padStart(2, "0");
+    const year = String(now.getFullYear());
+    const month = String(now.getMonth() + 1).padStart(2, "0");
+    const day = String(now.getDate()).padStart(2, "0");
+    const hours = String(now.getHours()).padStart(2, "0");
+    const minutes = String(now.getMinutes()).padStart(2, "0");
+    const seconds = String(now.getSeconds()).padStart(2, "0");
     const mseconds = String(rawNow.getMilliseconds()).padStart(3, "0");
 
-    BaseInfoList.DeviceNowTime = [now, year, month, day, hours, minutes, seconds, mseconds];
-}
+    const result = [now, year, month, day, hours, minutes, seconds, mseconds];
 
+    // locale があって、かつ本当にサポートされている場合のみ weekday を追加
+    if (locale && Intl.DateTimeFormat.supportedLocalesOf([locale]).length > 0) {
+        const weekday = new Intl.DateTimeFormat(locale, {
+            timeZone: tz,
+            weekday: "short"
+        }).format(now);
+
+        result.push(weekday);
+    }
+
+    BaseInfoList.DeviceNowTime = result;
+}
 // ─────────────────────────────────────────
 // NTP 時刻補正
 // ─────────────────────────────────────────
@@ -181,6 +190,23 @@ function GetNTPNowTime() {
 // ─────────────────────────────────────────
 // 時刻表示更新
 // ─────────────────────────────────────────
+
+function DateViewChange() {
+    var DateViewText =
+        BaseInfoList.DeviceNowTime[1] + "/" +
+        BaseInfoList.DeviceNowTime[2] + "/" +
+        BaseInfoList.DeviceNowTime[3];
+    if (BaseInfoList.DeviceNowTime[8]) {
+        DateViewText += " (" + BaseInfoList.DeviceNowTime[8] + ")";
+    }
+    if (document.getElementById("DateViewSetting").checked) {
+        document.getElementById("DateView").style.display = "block";
+        document.getElementById("DateView").innerHTML = DateViewText
+    } else {
+        document.getElementById("DateView").style.display = "none";
+    }
+}
+
 function TimeViewChange() {
     const ms = String(BaseInfoList.DeviceNowTime[7]).padStart(3, '0').slice(0, 2);
     const TimeViewText =
@@ -197,6 +223,7 @@ function TimeViewChange() {
 function loop() {
     setInterval(() => {
         GetDeviceNowTime();
+        DateViewChange();
         TimeViewChange();
     }, 10);
 

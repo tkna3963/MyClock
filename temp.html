@@ -1,1157 +1,1035 @@
 <!DOCTYPE html>
 <html lang="ja">
-
 <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
-    <title>AI POS QRスキャナー</title>
-    <script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
-    <style>
-        @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap');
-
-        :root {
-            --bg: #060810;
-            --panel: #0d1117;
-            --border: #1a2332;
-            --accent: #00d4ff;
-            --accent2: #ff4d6d;
-            --ai: #a855f7;
-            --success: #00ff9d;
-            --warn: #ffbe0b;
-            --text: #cdd6f4;
-            --muted: #45566a;
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
-        }
-
-        body {
-            font-family: 'Zen Kaku Gothic New', sans-serif;
-            background: var(--bg);
-            color: var(--text);
-            min-height: 100svh;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            padding: 12px 14px 24px;
-        }
-
-        /* ── Header ── */
-        .header {
-            width: 100%;
-            max-width: 540px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            padding-bottom: 12px;
-            border-bottom: 1px solid var(--border);
-            margin-bottom: 12px;
-        }
-
-        .logo {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .logo-badge {
-            background: linear-gradient(135deg, var(--ai), #6366f1);
-            color: #fff;
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.62rem;
-            letter-spacing: 0.15em;
-            padding: 3px 8px;
-            border-radius: 4px;
-        }
-
-        .logo-title {
-            font-size: 1rem;
-            font-weight: 900;
-            color: var(--accent);
-            font-family: 'Share Tech Mono', monospace;
-            letter-spacing: 0.04em;
-        }
-
-        .live-badge {
-            display: flex;
-            align-items: center;
-            gap: 5px;
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.65rem;
-            color: var(--success);
-        }
-
-        .live-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background: var(--success);
-            box-shadow: 0 0 6px var(--success);
-            animation: blink 1s infinite;
-        }
-
-        @keyframes blink {
-
-            0%,
-            100% {
-                opacity: 1
-            }
-
-            50% {
-                opacity: 0.3
-            }
-        }
-
-        /* ── AI Brain indicator ── */
-        .ai-status {
-            width: 100%;
-            max-width: 540px;
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 10px;
-            padding: 9px 14px;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 10px;
-            font-size: 0.72rem;
-            font-family: 'Share Tech Mono', monospace;
-        }
-
-        .ai-icon {
-            font-size: 1rem;
-            animation: aiPulse 2s infinite;
-        }
-
-        @keyframes aiPulse {
-
-            0%,
-            100% {
-                filter: drop-shadow(0 0 4px var(--ai));
-            }
-
-            50% {
-                filter: drop-shadow(0 0 12px var(--ai));
-            }
-        }
-
-        .ai-text {
-            color: var(--ai);
-            flex: 1;
-        }
-
-        .ai-metrics {
-            display: flex;
-            gap: 12px;
-            color: var(--muted);
-        }
-
-        .ai-metrics span {
-            color: var(--accent);
-        }
-
-        /* ── Scanner ── */
-        .scanner-wrap {
-            position: relative;
-            width: 100%;
-            max-width: 540px;
-            background: #000;
-            border-radius: 14px;
-            overflow: hidden;
-            border: 1.5px solid var(--border);
-            aspect-ratio: 4/3;
-        }
-
-        video {
-            width: 100%;
-            height: 100%;
-            object-fit: cover;
-            display: block;
-        }
-
-        canvas#overlay {
-            position: absolute;
-            inset: 0;
-            width: 100%;
-            height: 100%;
-            pointer-events: none;
-        }
-
-        /* ROI枠 */
-        .roi-frame {
-            position: absolute;
-            border: 1.5px dashed rgba(0, 212, 255, 0.35);
-            border-radius: 8px;
-            pointer-events: none;
-            transition: all 0.4s ease;
-            /* JSで動的にサイズ変更 */
-            top: 15%;
-            left: 15%;
-            width: 70%;
-            height: 70%;
-        }
-
-        /* コーナー */
-        .corners {
-            position: absolute;
-            inset: 0;
-            pointer-events: none;
-        }
-
-        .corner {
-            position: absolute;
-            width: 22px;
-            height: 22px;
-            border-color: var(--accent);
-            border-style: solid;
-            opacity: 0.9;
-            transition: border-color 0.2s;
-        }
-
-        .corner.tl {
-            top: 14px;
-            left: 14px;
-            border-width: 3px 0 0 3px;
-            border-radius: 4px 0 0 0;
-        }
-
-        .corner.tr {
-            top: 14px;
-            right: 14px;
-            border-width: 3px 3px 0 0;
-            border-radius: 0 4px 0 0;
-        }
-
-        .corner.bl {
-            bottom: 14px;
-            left: 14px;
-            border-width: 0 0 3px 3px;
-            border-radius: 0 0 0 4px;
-        }
-
-        .corner.br {
-            bottom: 14px;
-            right: 14px;
-            border-width: 0 3px 3px 0;
-            border-radius: 0 0 4px 0;
-        }
-
-        .corner.hit {
-            border-color: var(--success);
-        }
-
-        /* スキャンライン */
-        .scan-line {
-            position: absolute;
-            left: 14px;
-            right: 14px;
-            height: 1.5px;
-            background: linear-gradient(90deg, transparent, var(--accent), transparent);
-            box-shadow: 0 0 10px var(--accent);
-            animation: scanMove 1.6s ease-in-out infinite;
-        }
-
-        @keyframes scanMove {
-            0% {
-                top: 14px;
-            }
-
-            50% {
-                top: calc(100% - 14px);
-            }
-
-            100% {
-                top: 14px;
-            }
-        }
-
-        /* モーション状態バー */
-        .motion-bar-wrap {
-            position: absolute;
-            bottom: 0;
-            left: 0;
-            right: 0;
-            height: 3px;
-            background: rgba(255, 255, 255, 0.05);
-        }
-
-        .motion-bar {
-            height: 100%;
-            width: 0%;
-            background: var(--warn);
-            transition: width 0.1s, background 0.2s;
-        }
-
-        /* ステータスオーバーレイ */
-        .scan-state-label {
-            position: absolute;
-            top: 12px;
-            right: 14px;
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.6rem;
-            letter-spacing: 0.1em;
-            padding: 3px 8px;
-            border-radius: 4px;
-            background: rgba(10, 14, 26, 0.75);
-            backdrop-filter: blur(4px);
-            color: var(--muted);
-            transition: all 0.2s;
-        }
-
-        /* ── 統計バー ── */
-        .stats-row {
-            width: 100%;
-            max-width: 540px;
-            display: grid;
-            grid-template-columns: repeat(4, 1fr);
-            gap: 6px;
-            margin: 8px 0;
-        }
-
-        .stat-card {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 9px;
-            padding: 8px 10px;
-            text-align: center;
-        }
-
-        .stat-card .sv {
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 1.15rem;
-            font-weight: bold;
-            color: var(--accent);
-            line-height: 1;
-        }
-
-        .stat-card .sl {
-            font-size: 0.58rem;
-            color: var(--muted);
-            margin-top: 3px;
-            text-transform: uppercase;
-            letter-spacing: 0.08em;
-        }
-
-        /* ── 結果 ── */
-        .result-panel {
-            width: 100%;
-            max-width: 540px;
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 13px;
-            padding: 14px 18px;
-            margin-bottom: 10px;
-            transition: border-color 0.15s, box-shadow 0.15s;
-        }
-
-        .result-panel.hit {
-            border-color: var(--success);
-            box-shadow: 0 0 24px rgba(0, 255, 157, 0.13);
-        }
-
-        .result-label {
-            font-size: 0.62rem;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            color: var(--muted);
-            font-family: 'Share Tech Mono', monospace;
-            margin-bottom: 6px;
-        }
-
-        .result-value {
-            font-size: 1.1rem;
-            font-weight: 700;
-            color: var(--success);
-            word-break: break-all;
-            line-height: 1.45;
-            min-height: 1.45em;
-        }
-
-        .result-meta {
-            margin-top: 5px;
-            font-size: 0.65rem;
-            color: var(--muted);
-            font-family: 'Share Tech Mono', monospace;
-        }
-
-        /* ── AI分析パネル ── */
-        .ai-panel {
-            width: 100%;
-            max-width: 540px;
-            background: linear-gradient(135deg, #13001f, #0d1117);
-            border: 1px solid rgba(168, 85, 247, 0.25);
-            border-radius: 13px;
-            padding: 13px 18px;
-            margin-bottom: 10px;
-        }
-
-        .ai-panel-title {
-            font-size: 0.62rem;
-            letter-spacing: 0.12em;
-            text-transform: uppercase;
-            color: var(--ai);
-            font-family: 'Share Tech Mono', monospace;
-            margin-bottom: 10px;
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        .ai-chips {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 6px;
-        }
-
-        .chip {
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.65rem;
-            padding: 4px 10px;
-            border-radius: 20px;
-            border: 1px solid;
-            display: flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        .chip.on {
-            border-color: rgba(0, 255, 157, 0.4);
-            color: var(--success);
-            background: rgba(0, 255, 157, 0.07);
-        }
-
-        .chip.off {
-            border-color: var(--border);
-            color: var(--muted);
-        }
-
-        .chip.ai {
-            border-color: rgba(168, 85, 247, 0.4);
-            color: var(--ai);
-            background: rgba(168, 85, 247, 0.07);
-        }
-
-        /* ── 履歴 ── */
-        .history-hdr {
-            width: 100%;
-            max-width: 540px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            margin-bottom: 7px;
-        }
-
-        .history-title {
-            font-size: 0.65rem;
-            letter-spacing: 0.1em;
-            text-transform: uppercase;
-            color: var(--muted);
-            font-family: 'Share Tech Mono', monospace;
-        }
-
-        .clear-btn {
-            font-size: 0.62rem;
-            font-family: 'Share Tech Mono', monospace;
-            background: none;
-            border: 1px solid var(--border);
-            color: var(--muted);
-            padding: 3px 10px;
-            border-radius: 6px;
-            cursor: pointer;
-        }
-
-        .history-list {
-            width: 100%;
-            max-width: 540px;
-            display: flex;
-            flex-direction: column;
-            gap: 5px;
-            max-height: 200px;
-            overflow-y: auto;
-        }
-
-        .history-item {
-            background: var(--panel);
-            border: 1px solid var(--border);
-            border-radius: 9px;
-            padding: 9px 13px;
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            gap: 10px;
-            animation: slideIn 0.12s ease;
-        }
-
-        @keyframes slideIn {
-            from {
-                opacity: 0;
-                transform: translateY(-5px)
-            }
-
-            to {
-                opacity: 1;
-                transform: translateY(0)
-            }
-        }
-
-        .hi-data {
-            font-size: 0.85rem;
-            font-weight: 600;
-            flex: 1;
-            overflow: hidden;
-            text-overflow: ellipsis;
-            white-space: nowrap;
-        }
-
-        .hi-time {
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.6rem;
-            color: var(--muted);
-            white-space: nowrap;
-        }
-
-        .hi-cnt {
-            font-family: 'Share Tech Mono', monospace;
-            font-size: 0.6rem;
-            color: var(--accent2);
-            background: rgba(255, 77, 109, 0.1);
-            padding: 1px 7px;
-            border-radius: 20px;
-            display: none;
-        }
-
-        .hi-cnt.show {
-            display: block;
-        }
-    </style>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+<title>AI POS QRスキャナー</title>
+<script src="https://cdn.jsdelivr.net/npm/jsqr/dist/jsQR.js"></script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Zen+Kaku+Gothic+New:wght@400;700;900&display=swap');
+
+:root {
+  --bg: #060810;
+  --panel: #0d1117;
+  --border: #1a2332;
+  --accent: #00d4ff;
+  --accent2: #ff4d6d;
+  --ai: #a855f7;
+  --success: #00ff9d;
+  --warn: #ffbe0b;
+  --text: #cdd6f4;
+  --muted: #45566a;
+}
+
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+  font-family: 'Zen Kaku Gothic New', sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100svh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 12px 14px 24px;
+}
+
+/* ── Header ── */
+.header {
+  width: 100%; max-width: 540px;
+  display: flex; align-items: center; justify-content: space-between;
+  padding-bottom: 12px;
+  border-bottom: 1px solid var(--border);
+  margin-bottom: 12px;
+}
+.logo {
+  display: flex; align-items: center; gap: 8px;
+}
+.logo-badge {
+  background: linear-gradient(135deg, var(--ai), #6366f1);
+  color: #fff;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.62rem;
+  letter-spacing: 0.15em;
+  padding: 3px 8px;
+  border-radius: 4px;
+}
+.logo-title {
+  font-size: 1rem; font-weight: 900;
+  color: var(--accent);
+  font-family: 'Share Tech Mono', monospace;
+  letter-spacing: 0.04em;
+}
+.live-badge {
+  display: flex; align-items: center; gap: 5px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem; color: var(--success);
+}
+.live-dot {
+  width: 7px; height: 7px; border-radius: 50%;
+  background: var(--success);
+  box-shadow: 0 0 6px var(--success);
+  animation: blink 1s infinite;
+}
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.3} }
+
+/* ── カメラ選択 ── */
+.camera-select-wrap {
+  width: 100%; max-width: 540px;
+  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 8px;
+}
+.camera-select {
+  flex: 1;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--text);
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.72rem;
+  padding: 8px 12px;
+  appearance: none;
+  -webkit-appearance: none;
+  cursor: pointer;
+  outline: none;
+  transition: border-color 0.2s;
+}
+.camera-select:focus { border-color: var(--accent); }
+.camera-select option { background: #0d1117; }
+.cam-refresh-btn {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  color: var(--muted);
+  font-size: 1rem;
+  width: 38px; height: 38px;
+  cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  transition: all 0.15s;
+  flex-shrink: 0;
+}
+.cam-refresh-btn:active { background: var(--border); transform: rotate(180deg); }
+
+/* ── AI Brain indicator ── */
+.ai-status {
+  width: 100%; max-width: 540px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 14px;
+  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 10px;
+  font-size: 0.72rem;
+  font-family: 'Share Tech Mono', monospace;
+}
+.ai-icon {
+  font-size: 1rem;
+  animation: aiPulse 2s infinite;
+}
+@keyframes aiPulse {
+  0%,100%{ filter: drop-shadow(0 0 4px var(--ai)); }
+  50%{ filter: drop-shadow(0 0 12px var(--ai)); }
+}
+.ai-text { color: var(--ai); flex: 1; }
+.ai-metrics { display: flex; gap: 12px; color: var(--muted); }
+.ai-metrics span { color: var(--accent); }
+
+/* ── Scanner ── */
+.scanner-wrap {
+  position: relative;
+  width: 100%; max-width: 540px;
+  background: #000;
+  border-radius: 14px;
+  overflow: hidden;
+  border: 1.5px solid var(--border);
+  aspect-ratio: 4/3;
+}
+video { width: 100%; height: 100%; object-fit: cover; display: block; }
+
+canvas#overlay {
+  position: absolute; inset: 0;
+  width: 100%; height: 100%;
+  pointer-events: none;
+}
+
+/* ROI枠 */
+.roi-frame {
+  position: absolute;
+  border: 1.5px dashed rgba(0,212,255,0.35);
+  border-radius: 8px;
+  pointer-events: none;
+  transition: all 0.4s ease;
+  /* JSで動的にサイズ変更 */
+  top: 15%; left: 15%; width: 70%; height: 70%;
+}
+
+/* コーナー */
+.corners { position: absolute; inset: 0; pointer-events: none; }
+.corner {
+  position: absolute; width: 22px; height: 22px;
+  border-color: var(--accent); border-style: solid; opacity: 0.9;
+  transition: border-color 0.2s;
+}
+.corner.tl { top:14px; left:14px;  border-width:3px 0 0 3px; border-radius:4px 0 0 0; }
+.corner.tr { top:14px; right:14px; border-width:3px 3px 0 0; border-radius:0 4px 0 0; }
+.corner.bl { bottom:14px; left:14px;  border-width:0 0 3px 3px; border-radius:0 0 0 4px; }
+.corner.br { bottom:14px; right:14px; border-width:0 3px 3px 0; border-radius:0 0 4px 0; }
+.corner.hit { border-color: var(--success); }
+
+/* スキャンライン */
+.scan-line {
+  position: absolute; left: 14px; right: 14px; height: 1.5px;
+  background: linear-gradient(90deg, transparent, var(--accent), transparent);
+  box-shadow: 0 0 10px var(--accent);
+  animation: scanMove 1.6s ease-in-out infinite;
+}
+@keyframes scanMove {
+  0%   { top: 14px; }
+  50%  { top: calc(100% - 14px); }
+  100% { top: 14px; }
+}
+
+/* モーション状態バー */
+.motion-bar-wrap {
+  position: absolute; bottom: 0; left: 0; right: 0;
+  height: 3px; background: rgba(255,255,255,0.05);
+}
+.motion-bar {
+  height: 100%; width: 0%;
+  background: var(--warn);
+  transition: width 0.1s, background 0.2s;
+}
+
+/* ステータスオーバーレイ */
+.scan-state-label {
+  position: absolute; top: 12px; right: 14px;
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.6rem; letter-spacing: 0.1em;
+  padding: 3px 8px; border-radius: 4px;
+  background: rgba(10,14,26,0.75);
+  backdrop-filter: blur(4px);
+  color: var(--muted);
+  transition: all 0.2s;
+}
+
+/* ── 統計バー ── */
+.stats-row {
+  width: 100%; max-width: 540px;
+  display: grid; grid-template-columns: repeat(4, 1fr);
+  gap: 6px; margin: 8px 0;
+}
+.stat-card {
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 9px;
+  padding: 8px 10px;
+  text-align: center;
+}
+.stat-card .sv {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 1.15rem; font-weight: bold;
+  color: var(--accent);
+  line-height: 1;
+}
+.stat-card .sl {
+  font-size: 0.58rem; color: var(--muted);
+  margin-top: 3px; text-transform: uppercase; letter-spacing: 0.08em;
+}
+
+/* ── 結果 ── */
+.result-panel {
+  width: 100%; max-width: 540px;
+  background: var(--panel);
+  border: 1px solid var(--border);
+  border-radius: 13px;
+  padding: 14px 18px;
+  margin-bottom: 10px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+.result-panel.hit {
+  border-color: var(--success);
+  box-shadow: 0 0 24px rgba(0,255,157,0.13);
+}
+.result-label {
+  font-size: 0.62rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--muted);
+  font-family: 'Share Tech Mono', monospace;
+  margin-bottom: 6px;
+}
+.result-value {
+  font-size: 1.1rem; font-weight: 700;
+  color: var(--success); word-break: break-all; line-height: 1.45;
+  min-height: 1.45em;
+}
+.result-meta {
+  margin-top: 5px;
+  font-size: 0.65rem; color: var(--muted);
+  font-family: 'Share Tech Mono', monospace;
+}
+
+/* ── AI分析パネル ── */
+.ai-panel {
+  width: 100%; max-width: 540px;
+  background: linear-gradient(135deg, #13001f, #0d1117);
+  border: 1px solid rgba(168,85,247,0.25);
+  border-radius: 13px;
+  padding: 13px 18px;
+  margin-bottom: 10px;
+}
+.ai-panel-title {
+  font-size: 0.62rem; letter-spacing: 0.12em;
+  text-transform: uppercase; color: var(--ai);
+  font-family: 'Share Tech Mono', monospace;
+  margin-bottom: 10px;
+  display: flex; align-items: center; gap: 6px;
+}
+.ai-chips {
+  display: flex; flex-wrap: wrap; gap: 6px;
+}
+.chip {
+  font-family: 'Share Tech Mono', monospace;
+  font-size: 0.65rem;
+  padding: 4px 10px; border-radius: 20px;
+  border: 1px solid;
+  display: flex; align-items: center; gap: 4px;
+}
+.chip.on  { border-color: rgba(0,255,157,0.4); color: var(--success); background: rgba(0,255,157,0.07); }
+.chip.off { border-color: var(--border); color: var(--muted); }
+.chip.ai  { border-color: rgba(168,85,247,0.4); color: var(--ai); background: rgba(168,85,247,0.07); }
+
+/* ── 履歴 ── */
+.history-hdr {
+  width: 100%; max-width: 540px;
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 7px;
+}
+.history-title {
+  font-size: 0.65rem; letter-spacing: 0.1em; text-transform: uppercase;
+  color: var(--muted); font-family: 'Share Tech Mono', monospace;
+}
+.clear-btn {
+  font-size: 0.62rem; font-family: 'Share Tech Mono', monospace;
+  background: none; border: 1px solid var(--border); color: var(--muted);
+  padding: 3px 10px; border-radius: 6px; cursor: pointer;
+}
+.history-list {
+  width: 100%; max-width: 540px;
+  display: flex; flex-direction: column; gap: 5px;
+  max-height: 200px; overflow-y: auto;
+}
+.history-item {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 9px; padding: 9px 13px;
+  display: flex; justify-content: space-between; align-items: center; gap: 10px;
+  animation: slideIn 0.12s ease;
+}
+@keyframes slideIn { from{opacity:0;transform:translateY(-5px)} to{opacity:1;transform:translateY(0)} }
+.hi-data { font-size: 0.85rem; font-weight: 600; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.hi-time { font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; color: var(--muted); white-space: nowrap; }
+.hi-cnt  { font-family: 'Share Tech Mono', monospace; font-size: 0.6rem; color: var(--accent2); background: rgba(255,77,109,0.1); padding: 1px 7px; border-radius: 20px; display: none; }
+.hi-cnt.show { display: block; }
+</style>
 </head>
-
 <body>
 
-    <!-- Header -->
-    <div class="header">
-        <div class="logo">
-            <div class="logo-badge">AI</div>
-            <div class="logo-title">POS QR SCANNER</div>
-        </div>
-        <div class="live-badge">
-            <div class="live-dot"></div>LIVE
-        </div>
-    </div>
+<!-- Header -->
+<div class="header">
+  <div class="logo">
+    <div class="logo-badge">AI</div>
+    <div class="logo-title">POS QR SCANNER</div>
+  </div>
+  <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+</div>
 
-    <!-- AI Status -->
-    <div class="ai-status">
-        <div class="ai-icon">🧠</div>
-        <div class="ai-text" id="aiText">AI最適化エンジン 起動中...</div>
-        <div class="ai-metrics">
-            スキップ率 <span id="skipRate">0%</span>
-        </div>
-    </div>
+<!-- Camera Selector -->
+<div class="camera-select-wrap">
+  <select class="camera-select" id="cameraSelect">
+    <option value="">📷 カメラを読み込み中...</option>
+  </select>
+  <button class="cam-refresh-btn" id="camRefreshBtn" title="カメラ一覧を更新">🔄</button>
+</div>
 
-    <!-- Scanner -->
-    <div class="scanner-wrap">
-        <video id="video" autoplay playsinline muted></video>
-        <canvas id="overlay"></canvas>
-        <div class="roi-frame" id="roiFrame"></div>
-        <div class="corners">
-            <div class="corner tl" id="c-tl"></div>
-            <div class="corner tr" id="c-tr"></div>
-            <div class="corner bl" id="c-bl"></div>
-            <div class="corner br" id="c-br"></div>
-        </div>
-        <div class="scan-line" id="scanLine"></div>
-        <div class="motion-bar-wrap">
-            <div class="motion-bar" id="motionBar"></div>
-        </div>
-        <div class="scan-state-label" id="stateLabel">INIT</div>
-    </div>
+<!-- AI Status -->
+<div class="ai-status">
+  <div class="ai-icon">🧠</div>
+  <div class="ai-text" id="aiText">AI最適化エンジン 起動中...</div>
+  <div class="ai-metrics">
+    スキップ率 <span id="skipRate">0%</span>
+  </div>
+</div>
 
-    <!-- Stats -->
-    <div class="stats-row">
-        <div class="stat-card">
-            <div class="sv" id="sFps">--</div>
-            <div class="sl">FPS</div>
-        </div>
-        <div class="stat-card">
-            <div class="sv" id="sLatency">--</div>
-            <div class="sl">遅延ms</div>
-        </div>
-        <div class="stat-card">
-            <div class="sv" id="sTotal">0</div>
-            <div class="sl">スキャン数</div>
-        </div>
-        <div class="stat-card">
-            <div class="sv" id="sSkipped">0</div>
-            <div class="sl">省略フレーム</div>
-        </div>
-    </div>
+<!-- Scanner -->
+<div class="scanner-wrap">
+  <video id="video" autoplay playsinline muted></video>
+  <canvas id="overlay"></canvas>
+  <div class="roi-frame" id="roiFrame"></div>
+  <div class="corners">
+    <div class="corner tl" id="c-tl"></div>
+    <div class="corner tr" id="c-tr"></div>
+    <div class="corner bl" id="c-bl"></div>
+    <div class="corner br" id="c-br"></div>
+  </div>
+  <div class="scan-line" id="scanLine"></div>
+  <div class="motion-bar-wrap"><div class="motion-bar" id="motionBar"></div></div>
+  <div class="scan-state-label" id="stateLabel">INIT</div>
+</div>
 
-    <!-- Result -->
-    <div class="result-panel" id="resultPanel">
-        <div class="result-label">最終スキャン結果</div>
-        <div class="result-value" id="resultValue">QRコードをかざしてください</div>
-        <div class="result-meta" id="resultMeta"></div>
-    </div>
+<!-- Stats -->
+<div class="stats-row">
+  <div class="stat-card"><div class="sv" id="sFps">--</div><div class="sl">FPS</div></div>
+  <div class="stat-card"><div class="sv" id="sLatency">--</div><div class="sl">遅延ms</div></div>
+  <div class="stat-card"><div class="sv" id="sTotal">0</div><div class="sl">スキャン数</div></div>
+  <div class="stat-card"><div class="sv" id="sSkipped">0</div><div class="sl">省略フレーム</div></div>
+</div>
 
-    <!-- AI Analysis Panel -->
-    <div class="ai-panel">
-        <div class="ai-panel-title">⚡ AI適応制御 — アクティブな最適化</div>
-        <div class="ai-chips" id="aiChips">
-            <div class="chip off" id="chip-motion">📷 動体検知</div>
-            <div class="chip off" id="chip-roi">🎯 ROI絞り込み</div>
-            <div class="chip off" id="chip-skip">⏭ フレームスキップ</div>
-            <div class="chip off" id="chip-cooldown">🔒 クールダウン</div>
-            <div class="chip ai" id="chip-adapt">🧠 適応サンプリング</div>
-            <div class="chip off" id="chip-stable">✅ 安定フレーム確認</div>
-        </div>
-    </div>
+<!-- Result -->
+<div class="result-panel" id="resultPanel">
+  <div class="result-label">最終スキャン結果</div>
+  <div class="result-value" id="resultValue">QRコードをかざしてください</div>
+  <div class="result-meta" id="resultMeta"></div>
+</div>
 
-    <!-- History -->
-    <div class="history-hdr">
-        <div class="history-title">📋 スキャン履歴</div>
-        <button class="clear-btn" id="clearBtn">クリア</button>
-    </div>
-    <div class="history-list" id="historyList"></div>
+<!-- AI Analysis Panel -->
+<div class="ai-panel">
+  <div class="ai-panel-title">⚡ AI適応制御 — アクティブな最適化</div>
+  <div class="ai-chips" id="aiChips">
+    <div class="chip off" id="chip-motion">📷 動体検知</div>
+    <div class="chip off" id="chip-roi">🎯 ROI絞り込み</div>
+    <div class="chip off" id="chip-skip">⏭ フレームスキップ</div>
+    <div class="chip off" id="chip-cooldown">🔒 クールダウン</div>
+    <div class="chip ai"  id="chip-adapt">🧠 適応サンプリング</div>
+    <div class="chip off" id="chip-stable">✅ 安定フレーム確認</div>
+  </div>
+</div>
 
-    <script>
-        // ════════════════════════════════════════════
-        //  設定（AIが動的に変更する値もここで管理）
-        // ════════════════════════════════════════════
-        const CFG = {
-            COOLDOWN_MS: 700,   // 同一QR再読み取り抑制
-            RESET_MS: 900,   // 検出後ロック解除まで
-            MOTION_THRESHOLD: 6000,  // 動体検知しきい値（AIが自動調整）
-            STABLE_FRAMES: 2,     // 連続静止フレーム数でスキャン開始
-            SKIP_ON_MOTION: true,  // 動いてる間スキャンをスキップ
-            ROI_ENABLED: true,  // 関心領域のみスキャン
-            ROI_MARGIN: 0.18,  // ROIマージン（0=全体, 0.3=中央40%）
-            FRAME_BUDGET_MS: 12,    // 1フレームあたりの処理予算
-            ADAPT_INTERVAL: 60,    // 何フレームごとにAIが設定を見直すか
-        };
+<!-- History -->
+<div class="history-hdr">
+  <div class="history-title">📋 スキャン履歴</div>
+  <button class="clear-btn" id="clearBtn">クリア</button>
+</div>
+<div class="history-list" id="historyList"></div>
 
-        // ════════════════════════════════════════════
-        //  DOM
-        // ════════════════════════════════════════════
-        const video = document.getElementById('video');
-        const canvas = document.getElementById('overlay');
-        const ctx = canvas.getContext('2d', { willReadFrequently: true });
-        const roiFrame = document.getElementById('roiFrame');
-        const stateLabel = document.getElementById('stateLabel');
-        const motionBar = document.getElementById('motionBar');
-        const resultPanel = document.getElementById('resultPanel');
-        const resultValue = document.getElementById('resultValue');
-        const resultMeta = document.getElementById('resultMeta');
-        const historyList = document.getElementById('historyList');
-        const aiText = document.getElementById('aiText');
-        const clearBtn = document.getElementById('clearBtn');
+<script>
+// ════════════════════════════════════════════
+//  設定（AIが動的に変更する値もここで管理）
+// ════════════════════════════════════════════
+const CFG = {
+  COOLDOWN_MS:        700,   // 同一QR再読み取り抑制
+  RESET_MS:           900,   // 検出後ロック解除まで
+  MOTION_THRESHOLD:   6000,  // 動体検知しきい値（AIが自動調整）
+  STABLE_FRAMES:      2,     // 連続静止フレーム数でスキャン開始
+  SKIP_ON_MOTION:     true,  // 動いてる間スキャンをスキップ
+  ROI_ENABLED:        true,  // 関心領域のみスキャン
+  ROI_MARGIN:         0.18,  // ROIマージン（0=全体, 0.3=中央40%）
+  FRAME_BUDGET_MS:    12,    // 1フレームあたりの処理予算
+  ADAPT_INTERVAL:     60,    // 何フレームごとにAIが設定を見直すか
+};
 
-        const sFps = document.getElementById('sFps');
-        const sLatency = document.getElementById('sLatency');
-        const sTotal = document.getElementById('sTotal');
-        const sSkipped = document.getElementById('sSkipped');
-        const skipRateEl = document.getElementById('skipRate');
+// ════════════════════════════════════════════
+//  DOM
+// ════════════════════════════════════════════
+const video       = document.getElementById('video');
+const canvas      = document.getElementById('overlay');
+const ctx         = canvas.getContext('2d', { willReadFrequently: true });
+const roiFrame    = document.getElementById('roiFrame');
+const stateLabel  = document.getElementById('stateLabel');
+const motionBar   = document.getElementById('motionBar');
+const resultPanel = document.getElementById('resultPanel');
+const resultValue = document.getElementById('resultValue');
+const resultMeta  = document.getElementById('resultMeta');
+const historyList = document.getElementById('historyList');
+const aiText      = document.getElementById('aiText');
+const clearBtn    = document.getElementById('clearBtn');
 
-        // ════════════════════════════════════════════
-        //  状態
-        // ════════════════════════════════════════════
-        let isLocked = false;
-        let totalScans = 0;
-        let skippedFrames = 0;
-        let totalFrames = 0;
-        let stableCount = 0;         // 連続静止フレーム数
-        let lastCode = '';
-        let lastCodeTime = 0;
-        let prevGray = null;      // 前フレームのグレースケール（軽量差分用）
-        let currentMotion = 0;         // 現在のモーション値
+const sFps      = document.getElementById('sFps');
+const sLatency  = document.getElementById('sLatency');
+const sTotal    = document.getElementById('sTotal');
+const sSkipped  = document.getElementById('sSkipped');
+const skipRateEl= document.getElementById('skipRate');
 
-        // AI適応用の学習データ
-        const AI = {
-            recentMotions: [],          // 直近モーション値の履歴
-            recentLatency: [],          // 直近処理時間の履歴
-            frameCount: 0,
-            lastAdapt: 0,
-            mode: 'IDLE',      // IDLE / MOTION / STABLE / LOCKED
-        };
+// ════════════════════════════════════════════
+//  状態
+// ════════════════════════════════════════════
+let isLocked      = false;
+let totalScans    = 0;
+let skippedFrames = 0;
+let totalFrames   = 0;
+let stableCount   = 0;         // 連続静止フレーム数
+let lastCode      = '';
+let lastCodeTime  = 0;
+let prevGray      = null;      // 前フレームのグレースケール（軽量差分用）
+let currentMotion = 0;         // 現在のモーション値
 
-        // FPS
-        let fpsCounter = 0;
-        let fpsTimer = performance.now();
+// AI適応用の学習データ
+const AI = {
+  recentMotions:  [],          // 直近モーション値の履歴
+  recentLatency:  [],          // 直近処理時間の履歴
+  frameCount:     0,
+  lastAdapt:      0,
+  mode:           'IDLE',      // IDLE / MOTION / STABLE / LOCKED
+};
 
-        // 履歴
-        const history = [];
+// FPS
+let fpsCounter = 0;
+let fpsTimer   = performance.now();
 
-        // ════════════════════════════════════════════
-        //  カメラ起動
-        // ════════════════════════════════════════════
-        async function startCamera() {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    video: {
-                        facingMode: { ideal: 'environment' },
-                        width: { ideal: 1280 },
-                        height: { ideal: 720 },
-                        frameRate: { ideal: 60, min: 30 }
-                    }
-                });
-                video.srcObject = stream;
-            } catch (e) {
-                resultValue.textContent = 'カメラ起動失敗: ' + e.message;
-            }
-        }
+// 履歴
+const history = [];
 
-        // ════════════════════════════════════════════
-        //  グレースケール変換（軽量・高速）
-        // ════════════════════════════════════════════
-        function toGray(imageData, step = 8) {
-            const d = imageData.data;
-            const len = d.length;
-            const out = new Uint8Array(Math.ceil(len / (4 * step)));
-            for (let i = 0, j = 0; i < len; i += 4 * step, j++) {
-                // BT.601 輝度変換
-                out[j] = (d[i] * 77 + d[i + 1] * 150 + d[i + 2] * 29) >> 8;
-            }
-            return out;
-        }
+// ════════════════════════════════════════════
+//  カメラ管理
+// ════════════════════════════════════════════
+const cameraSelect   = document.getElementById('cameraSelect');
+const camRefreshBtn  = document.getElementById('camRefreshBtn');
+let currentStream    = null;
+let scanLoopStarted  = false;
 
-        // ════════════════════════════════════════════
-        //  動体検知（差分ピクセル数ベース）
-        // ════════════════════════════════════════════
-        function detectMotion(gray) {
-            if (!prevGray || prevGray.length !== gray.length) {
-                prevGray = gray;
-                return 0;
-            }
-            let diff = 0;
-            const len = gray.length;
-            for (let i = 0; i < len; i++) {
-                if (Math.abs(gray[i] - prevGray[i]) > 20) diff++;
-            }
-            prevGray = gray;
-            return diff;
-        }
+// カメラ一覧を取得してセレクトを更新
+async function loadCameraList() {
+  try {
+    // 一度権限を取得してからenumerateDevices（ラベルが取れる）
+    if (!currentStream) {
+      const tmp = await navigator.mediaDevices.getUserMedia({ video: true });
+      tmp.getTracks().forEach(t => t.stop());
+    }
 
-        // ════════════════════════════════════════════
-        //  ROI計算
-        // ════════════════════════════════════════════
-        function getROI(w, h) {
-            if (!CFG.ROI_ENABLED) return { x: 0, y: 0, w, h };
-            const m = CFG.ROI_MARGIN;
-            return {
-                x: Math.floor(w * m),
-                y: Math.floor(h * m),
-                w: Math.floor(w * (1 - m * 2)),
-                h: Math.floor(h * (1 - m * 2)),
-            };
-        }
+    const devices = await navigator.mediaDevices.enumerateDevices();
+    const cameras = devices.filter(d => d.kind === 'videoinput');
 
-        // ════════════════════════════════════════════
-        //  🧠 AI 適応ロジック（毎ADAPT_INTERVALフレーム）
-        // ════════════════════════════════════════════
-        function aiAdapt() {
-            const motions = AI.recentMotions;
-            const latencies = AI.recentLatency;
-            if (motions.length < 10) return;
+    cameraSelect.innerHTML = '';
+    if (cameras.length === 0) {
+      cameraSelect.innerHTML = '<option value="">カメラが見つかりません</option>';
+      return;
+    }
 
-            const avgMotion = motions.reduce((a, b) => a + b, 0) / motions.length;
-            const avgLatency = latencies.reduce((a, b) => a + b, 0) / latencies.length;
-            const maxMotion = Math.max(...motions);
+    cameras.forEach((cam, i) => {
+      const opt = document.createElement('option');
+      opt.value = cam.deviceId;
+      // ラベルがあればそのまま、なければ番号で
+      const label = cam.label || `カメラ ${i + 1}`;
+      // 背面カメラっぽければアイコン付き
+      const icon = /back|rear|environment|広角|超広角|望遠/i.test(label) ? '📷' :
+                   /front|face|user|前面/i.test(label) ? '🤳' : '🎥';
+      opt.textContent = `${icon} ${label}`;
+      cameraSelect.appendChild(opt);
+    });
 
-            let changed = [];
+    // デフォルト：背面カメラを優先選択
+    const backCam = cameras.find(c => /back|rear|environment|広角/i.test(c.label));
+    if (backCam) cameraSelect.value = backCam.deviceId;
 
-            // ── モーションしきい値の自動調整 ──
-            // 平均モーションが高い環境 → しきい値を上げてスキャン機会を増やす
-            // 平均モーションが低い環境 → しきい値を下げて誤検知を減らす
-            const newThreshold = Math.max(2000, Math.min(20000, avgMotion * 1.8));
-            if (Math.abs(newThreshold - CFG.MOTION_THRESHOLD) > 500) {
-                CFG.MOTION_THRESHOLD = Math.round(newThreshold);
-                changed.push(`動体TH→${CFG.MOTION_THRESHOLD}`);
-            }
+  } catch(e) {
+    cameraSelect.innerHTML = `<option value="">⚠️ 権限エラー: ${e.message}</option>`;
+    resultValue.textContent = 'カメラ権限が必要です: ' + e.message;
+  }
+}
 
-            // ── ROIの自動調整 ──
-            // 処理が重い（遅延大）→ ROIを絞る
-            // 処理が軽い（遅延小）→ ROIを広げてスキャン範囲拡大
-            if (avgLatency > CFG.FRAME_BUDGET_MS * 1.5) {
-                const newMargin = Math.min(0.30, CFG.ROI_MARGIN + 0.02);
-                if (newMargin !== CFG.ROI_MARGIN) {
-                    CFG.ROI_MARGIN = newMargin;
-                    changed.push('ROI縮小');
-                    updateROIVisual();
-                }
-            } else if (avgLatency < CFG.FRAME_BUDGET_MS * 0.7) {
-                const newMargin = Math.max(0.05, CFG.ROI_MARGIN - 0.02);
-                if (newMargin !== CFG.ROI_MARGIN) {
-                    CFG.ROI_MARGIN = newMargin;
-                    changed.push('ROI拡大');
-                    updateROIVisual();
-                }
-            }
+// 指定カメラで起動
+async function startCamera(deviceId) {
+  try {
+    // 既存ストリームを停止
+    if (currentStream) {
+      currentStream.getTracks().forEach(t => t.stop());
+      currentStream = null;
+    }
 
-            // ── STABLE_FRAMESの自動調整 ──
-            // 激しく揺れる環境 → 安定確認フレームを増やす
-            // 安定した環境    → 1フレームで即スキャン
-            const newStable = maxMotion > CFG.MOTION_THRESHOLD * 3 ? 3
-                : maxMotion > CFG.MOTION_THRESHOLD ? 2 : 1;
-            if (newStable !== CFG.STABLE_FRAMES) {
-                CFG.STABLE_FRAMES = newStable;
-                changed.push(`安定確認→${newStable}f`);
-            }
+    const constraints = {
+      video: {
+        width:     { ideal: 1280 },
+        height:    { ideal: 720  },
+        frameRate: { ideal: 60, min: 30 },
+      }
+    };
 
-            // UI更新
-            const skipPct = totalFrames > 0 ? Math.round(skippedFrames / totalFrames * 100) : 0;
-            skipRateEl.textContent = skipPct + '%';
+    if (deviceId) {
+      constraints.video.deviceId = { exact: deviceId };
+    } else {
+      constraints.video.facingMode = { ideal: 'environment' };
+    }
 
-            if (changed.length > 0) {
-                aiText.textContent = '🧠 AI調整: ' + changed.join('  /  ');
-                setTimeout(() => {
-                    aiText.textContent = `AI最適化中 — 平均遅延 ${Math.round(avgLatency)}ms / 平均動き ${Math.round(avgMotion)}`;
-                }, 2000);
-            } else {
-                aiText.textContent = `AI最適化中 — 平均遅延 ${Math.round(avgLatency)}ms / 平均動き ${Math.round(avgMotion)}`;
-            }
+    const stream = await navigator.mediaDevices.getUserMedia(constraints);
+    currentStream  = stream;
+    video.srcObject = stream;
 
-            // 履歴をリセット（スライドウィンドウ）
-            AI.recentMotions = motions.slice(-20);
-            AI.recentLatency = latencies.slice(-20);
-        }
+    resultValue.textContent = 'QRコードをかざしてください';
+    resultMeta.textContent  = '';
 
-        // ════════════════════════════════════════════
-        //  ROIビジュアル更新
-        // ════════════════════════════════════════════
-        function updateROIVisual() {
-            const m = CFG.ROI_MARGIN * 100;
-            const s = (1 - CFG.ROI_MARGIN * 2) * 100;
-            roiFrame.style.top = m + '%';
-            roiFrame.style.left = m + '%';
-            roiFrame.style.width = s + '%';
-            roiFrame.style.height = s + '%';
-        }
+  } catch(e) {
+    resultValue.textContent = 'カメラ起動失敗: ' + e.message;
+  }
+}
 
-        // ════════════════════════════════════════════
-        //  QR枠描画
-        // ════════════════════════════════════════════
-        function drawBox(loc, roi) {
-            const sx = canvas.offsetWidth / canvas.width;
-            const sy = canvas.offsetHeight / canvas.height;
+// カメラ切替
+cameraSelect.addEventListener('change', () => {
+  startCamera(cameraSelect.value);
+});
 
-            const ox = roi ? roi.x : 0;
-            const oy = roi ? roi.y : 0;
+// 一覧更新ボタン
+camRefreshBtn.addEventListener('click', async () => {
+  camRefreshBtn.style.transform = 'rotate(360deg)';
+  camRefreshBtn.style.transition = 'transform 0.4s';
+  await loadCameraList();
+  setTimeout(() => { camRefreshBtn.style.transform = ''; }, 400);
+  if (cameraSelect.value) startCamera(cameraSelect.value);
+});
 
-            const pts = [loc.topLeftCorner, loc.topRightCorner, loc.bottomRightCorner, loc.bottomLeftCorner];
+// ════════════════════════════════════════════
+//  グレースケール変換（軽量・高速）
+// ════════════════════════════════════════════
+function toGray(imageData, step = 8) {
+  const d = imageData.data;
+  const len = d.length;
+  const out = new Uint8Array(Math.ceil(len / (4 * step)));
+  for (let i = 0, j = 0; i < len; i += 4 * step, j++) {
+    // BT.601 輝度変換
+    out[j] = (d[i] * 77 + d[i+1] * 150 + d[i+2] * 29) >> 8;
+  }
+  return out;
+}
 
-            ctx.strokeStyle = '#00ff9d';
-            ctx.lineWidth = 4;
-            ctx.shadowColor = '#00ff9d';
-            ctx.shadowBlur = 14;
-            ctx.beginPath();
-            ctx.moveTo((pts[0].x + ox), (pts[0].y + oy));
-            for (let i = 1; i < pts.length; i++) {
-                ctx.lineTo((pts[i].x + ox), (pts[i].y + oy));
-            }
-            ctx.closePath();
-            ctx.stroke();
-            ctx.shadowBlur = 0;
+// ════════════════════════════════════════════
+//  動体検知（差分ピクセル数ベース）
+// ════════════════════════════════════════════
+function detectMotion(gray) {
+  if (!prevGray || prevGray.length !== gray.length) {
+    prevGray = gray;
+    return 0;
+  }
+  let diff = 0;
+  const len = gray.length;
+  for (let i = 0; i < len; i++) {
+    if (Math.abs(gray[i] - prevGray[i]) > 20) diff++;
+  }
+  prevGray = gray;
+  return diff;
+}
 
-            // コーナーを緑に
-            ['c-tl', 'c-tr', 'c-bl', 'c-br'].forEach(id => {
-                document.getElementById(id).classList.add('hit');
-            });
-        }
+// ════════════════════════════════════════════
+//  ROI計算
+// ════════════════════════════════════════════
+function getROI(w, h) {
+  if (!CFG.ROI_ENABLED) return { x: 0, y: 0, w, h };
+  const m = CFG.ROI_MARGIN;
+  return {
+    x: Math.floor(w * m),
+    y: Math.floor(h * m),
+    w: Math.floor(w * (1 - m * 2)),
+    h: Math.floor(h * (1 - m * 2)),
+  };
+}
 
-        function resetCorners() {
-            ['c-tl', 'c-tr', 'c-bl', 'c-br'].forEach(id => {
-                document.getElementById(id).classList.remove('hit');
-            });
-        }
+// ════════════════════════════════════════════
+//  🧠 AI 適応ロジック（毎ADAPT_INTERVALフレーム）
+// ════════════════════════════════════════════
+function aiAdapt() {
+  const motions  = AI.recentMotions;
+  const latencies = AI.recentLatency;
+  if (motions.length < 10) return;
 
-        // ════════════════════════════════════════════
-        //  チップ状態更新
-        // ════════════════════════════════════════════
-        function setChip(id, on) {
-            const el = document.getElementById('chip-' + id);
-            if (!el) return;
-            el.className = 'chip ' + (on ? 'on' : 'off');
-        }
+  const avgMotion  = motions.reduce((a,b)=>a+b,0) / motions.length;
+  const avgLatency = latencies.reduce((a,b)=>a+b,0) / latencies.length;
+  const maxMotion  = Math.max(...motions);
 
-        function updateChips() {
-            setChip('motion', CFG.SKIP_ON_MOTION);
-            setChip('roi', CFG.ROI_ENABLED);
-            setChip('skip', skippedFrames > 0);
-            setChip('cooldown', isLocked);
-            setChip('stable', stableCount >= CFG.STABLE_FRAMES);
-        }
+  let changed = [];
 
-        // ════════════════════════════════════════════
-        //  FPS計測
-        // ════════════════════════════════════════════
-        function updateFPS() {
-            fpsCounter++;
-            const now = performance.now();
-            if (now - fpsTimer >= 600) {
-                sFps.textContent = Math.round(fpsCounter / (now - fpsTimer) * 1000);
-                fpsCounter = 0;
-                fpsTimer = now;
-            }
-        }
+  // ── モーションしきい値の自動調整 ──
+  // 平均モーションが高い環境 → しきい値を上げてスキャン機会を増やす
+  // 平均モーションが低い環境 → しきい値を下げて誤検知を減らす
+  const newThreshold = Math.max(2000, Math.min(20000, avgMotion * 1.8));
+  if (Math.abs(newThreshold - CFG.MOTION_THRESHOLD) > 500) {
+    CFG.MOTION_THRESHOLD = Math.round(newThreshold);
+    changed.push(`動体TH→${CFG.MOTION_THRESHOLD}`);
+  }
 
-        // ════════════════════════════════════════════
-        //  結果表示・履歴
-        // ════════════════════════════════════════════
-        function showResult(data, latency) {
-            const now = new Date();
-            const timeStr = now.toLocaleTimeString('ja-JP', { hour12: false });
+  // ── ROIの自動調整 ──
+  // 処理が重い（遅延大）→ ROIを絞る
+  // 処理が軽い（遅延小）→ ROIを広げてスキャン範囲拡大
+  if (avgLatency > CFG.FRAME_BUDGET_MS * 1.5) {
+    const newMargin = Math.min(0.30, CFG.ROI_MARGIN + 0.02);
+    if (newMargin !== CFG.ROI_MARGIN) {
+      CFG.ROI_MARGIN = newMargin;
+      changed.push('ROI縮小');
+      updateROIVisual();
+    }
+  } else if (avgLatency < CFG.FRAME_BUDGET_MS * 0.7) {
+    const newMargin = Math.max(0.05, CFG.ROI_MARGIN - 0.02);
+    if (newMargin !== CFG.ROI_MARGIN) {
+      CFG.ROI_MARGIN = newMargin;
+      changed.push('ROI拡大');
+      updateROIVisual();
+    }
+  }
 
-            resultValue.textContent = data;
-            resultMeta.textContent = `検出: ${timeStr}  遅延: ${latency}ms  安定: ${stableCount}f`;
-            resultPanel.classList.add('hit');
-            sLatency.textContent = latency;
+  // ── STABLE_FRAMESの自動調整 ──
+  // 激しく揺れる環境 → 安定確認フレームを増やす
+  // 安定した環境    → 1フレームで即スキャン
+  const newStable = maxMotion > CFG.MOTION_THRESHOLD * 3 ? 3
+                  : maxMotion > CFG.MOTION_THRESHOLD     ? 2 : 1;
+  if (newStable !== CFG.STABLE_FRAMES) {
+    CFG.STABLE_FRAMES = newStable;
+    changed.push(`安定確認→${newStable}f`);
+  }
 
-            if (history.length > 0 && history[0].data === data) {
-                history[0].count++;
-            } else {
-                history.unshift({ data, time: timeStr, count: 1 });
-                if (history.length > 40) history.pop();
-            }
-            renderHistory();
-        }
+  // UI更新
+  const skipPct = totalFrames > 0 ? Math.round(skippedFrames / totalFrames * 100) : 0;
+  skipRateEl.textContent = skipPct + '%';
 
-        function renderHistory() {
-            historyList.innerHTML = '';
-            history.forEach(h => {
-                const el = document.createElement('div');
-                el.className = 'history-item';
-                el.innerHTML = `
+  if (changed.length > 0) {
+    aiText.textContent = '🧠 AI調整: ' + changed.join('  /  ');
+    setTimeout(() => {
+      aiText.textContent = `AI最適化中 — 平均遅延 ${Math.round(avgLatency)}ms / 平均動き ${Math.round(avgMotion)}`;
+    }, 2000);
+  } else {
+    aiText.textContent = `AI最適化中 — 平均遅延 ${Math.round(avgLatency)}ms / 平均動き ${Math.round(avgMotion)}`;
+  }
+
+  // 履歴をリセット（スライドウィンドウ）
+  AI.recentMotions  = motions.slice(-20);
+  AI.recentLatency  = latencies.slice(-20);
+}
+
+// ════════════════════════════════════════════
+//  ROIビジュアル更新
+// ════════════════════════════════════════════
+function updateROIVisual() {
+  const m = CFG.ROI_MARGIN * 100;
+  const s = (1 - CFG.ROI_MARGIN * 2) * 100;
+  roiFrame.style.top    = m + '%';
+  roiFrame.style.left   = m + '%';
+  roiFrame.style.width  = s + '%';
+  roiFrame.style.height = s + '%';
+}
+
+// ════════════════════════════════════════════
+//  QR枠描画
+// ════════════════════════════════════════════
+function drawBox(loc, roi) {
+  const sx = canvas.offsetWidth  / canvas.width;
+  const sy = canvas.offsetHeight / canvas.height;
+
+  const ox = roi ? roi.x : 0;
+  const oy = roi ? roi.y : 0;
+
+  const pts = [loc.topLeftCorner, loc.topRightCorner, loc.bottomRightCorner, loc.bottomLeftCorner];
+
+  ctx.strokeStyle = '#00ff9d';
+  ctx.lineWidth   = 4;
+  ctx.shadowColor = '#00ff9d';
+  ctx.shadowBlur  = 14;
+  ctx.beginPath();
+  ctx.moveTo((pts[0].x + ox), (pts[0].y + oy));
+  for (let i = 1; i < pts.length; i++) {
+    ctx.lineTo((pts[i].x + ox), (pts[i].y + oy));
+  }
+  ctx.closePath();
+  ctx.stroke();
+  ctx.shadowBlur = 0;
+
+  // コーナーを緑に
+  ['c-tl','c-tr','c-bl','c-br'].forEach(id => {
+    document.getElementById(id).classList.add('hit');
+  });
+}
+
+function resetCorners() {
+  ['c-tl','c-tr','c-bl','c-br'].forEach(id => {
+    document.getElementById(id).classList.remove('hit');
+  });
+}
+
+// ════════════════════════════════════════════
+//  チップ状態更新
+// ════════════════════════════════════════════
+function setChip(id, on) {
+  const el = document.getElementById('chip-' + id);
+  if (!el) return;
+  el.className = 'chip ' + (on ? 'on' : 'off');
+}
+
+function updateChips() {
+  setChip('motion',   CFG.SKIP_ON_MOTION);
+  setChip('roi',      CFG.ROI_ENABLED);
+  setChip('skip',     skippedFrames > 0);
+  setChip('cooldown', isLocked);
+  setChip('stable',   stableCount >= CFG.STABLE_FRAMES);
+}
+
+// ════════════════════════════════════════════
+//  FPS計測
+// ════════════════════════════════════════════
+function updateFPS() {
+  fpsCounter++;
+  const now = performance.now();
+  if (now - fpsTimer >= 600) {
+    sFps.textContent = Math.round(fpsCounter / (now - fpsTimer) * 1000);
+    fpsCounter = 0;
+    fpsTimer = now;
+  }
+}
+
+// ════════════════════════════════════════════
+//  結果表示・履歴
+// ════════════════════════════════════════════
+function showResult(data, latency) {
+  const now     = new Date();
+  const timeStr = now.toLocaleTimeString('ja-JP', { hour12: false });
+
+  resultValue.textContent = data;
+  resultMeta.textContent  = `検出: ${timeStr}  遅延: ${latency}ms  安定: ${stableCount}f`;
+  resultPanel.classList.add('hit');
+  sLatency.textContent = latency;
+
+  if (history.length > 0 && history[0].data === data) {
+    history[0].count++;
+  } else {
+    history.unshift({ data, time: timeStr, count: 1 });
+    if (history.length > 40) history.pop();
+  }
+  renderHistory();
+}
+
+function renderHistory() {
+  historyList.innerHTML = '';
+  history.forEach(h => {
+    const el = document.createElement('div');
+    el.className = 'history-item';
+    el.innerHTML = `
       <div class="hi-data">${esc(h.data)}</div>
       <div class="hi-time">${h.time}</div>
       <div class="hi-cnt ${h.count > 1 ? 'show' : ''}">×${h.count}</div>
     `;
-                historyList.appendChild(el);
-            });
-        }
+    historyList.appendChild(el);
+  });
+}
 
-        function esc(s) {
-            return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
-        }
+function esc(s) {
+  return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+}
 
-        // ════════════════════════════════════════════
-        //  メインスキャンループ
-        // ════════════════════════════════════════════
-        function scan() {
-            if (video.readyState < video.HAVE_ENOUGH_DATA) {
-                requestAnimationFrame(scan); return;
-            }
+// ════════════════════════════════════════════
+//  メインスキャンループ
+// ════════════════════════════════════════════
+function scan() {
+  if (video.readyState < video.HAVE_ENOUGH_DATA) {
+    requestAnimationFrame(scan); return;
+  }
 
-            totalFrames++;
-            AI.frameCount++;
-            updateFPS();
+  totalFrames++;
+  AI.frameCount++;
+  updateFPS();
 
-            const VW = video.videoWidth;
-            const VH = video.videoHeight;
+  const VW = video.videoWidth;
+  const VH = video.videoHeight;
 
-            if (canvas.width !== VW || canvas.height !== VH) {
-                canvas.width = VW;
-                canvas.height = VH;
-                updateROIVisual();
-            }
+  if (canvas.width !== VW || canvas.height !== VH) {
+    canvas.width  = VW;
+    canvas.height = VH;
+    updateROIVisual();
+  }
 
-            // ── フレームをキャンバスに描画 ──
-            ctx.drawImage(video, 0, 0, VW, VH);
+  // ── フレームをキャンバスに描画 ──
+  ctx.drawImage(video, 0, 0, VW, VH);
 
-            // ── ROI計算 ──
-            const roi = getROI(VW, VH);
+  // ── ROI計算 ──
+  const roi = getROI(VW, VH);
 
-            // ── 動体検知用グレースケール（全体の縮小版） ──
-            // ※ ROIサイズで取得して差分を見る（全画像より高速）
-            const motionData = ctx.getImageData(roi.x, roi.y, roi.w, roi.h);
-            const gray = toGray(motionData, 6);
-            currentMotion = detectMotion(gray);
+  // ── 動体検知用グレースケール（全体の縮小版） ──
+  // ※ ROIサイズで取得して差分を見る（全画像より高速）
+  const motionData = ctx.getImageData(roi.x, roi.y, roi.w, roi.h);
+  const gray = toGray(motionData, 6);
+  currentMotion = detectMotion(gray);
 
-            // モーション記録
-            AI.recentMotions.push(currentMotion);
+  // モーション記録
+  AI.recentMotions.push(currentMotion);
 
-            // モーションバーUI
-            const motionPct = Math.min(100, currentMotion / CFG.MOTION_THRESHOLD * 60);
-            motionBar.style.width = motionPct + '%';
-            motionBar.style.background = currentMotion > CFG.MOTION_THRESHOLD
-                ? 'var(--accent2)' : 'var(--warn)';
+  // モーションバーUI
+  const motionPct = Math.min(100, currentMotion / CFG.MOTION_THRESHOLD * 60);
+  motionBar.style.width = motionPct + '%';
+  motionBar.style.background = currentMotion > CFG.MOTION_THRESHOLD
+    ? 'var(--accent2)' : 'var(--warn)';
 
-            // ── ロック中 ──
-            if (isLocked) {
-                skippedFrames++;
-                sSkipped.textContent = skippedFrames;
-                setStateLabel('LOCKED', '#ff4d6d');
-                updateChips();
-                requestAnimationFrame(scan);
-                return;
-            }
+  // ── ロック中 ──
+  if (isLocked) {
+    skippedFrames++;
+    sSkipped.textContent = skippedFrames;
+    setStateLabel('LOCKED', '#ff4d6d');
+    updateChips();
+    requestAnimationFrame(scan);
+    return;
+  }
 
-            // ── 動体検知：ブレてる間はスキップ ──
-            if (CFG.SKIP_ON_MOTION && currentMotion > CFG.MOTION_THRESHOLD) {
-                stableCount = 0;
-                skippedFrames++;
-                sSkipped.textContent = skippedFrames;
-                setStateLabel('MOTION', 'var(--warn)');
-                if (!isLocked) ctx.clearRect(0, 0, VW, VH);
-                // もう一度映像を描画（表示用）
-                ctx.drawImage(video, 0, 0, VW, VH);
-                updateChips();
-                requestAnimationFrame(scan);
-                return;
-            }
+  // ── 動体検知：ブレてる間はスキップ ──
+  if (CFG.SKIP_ON_MOTION && currentMotion > CFG.MOTION_THRESHOLD) {
+    stableCount = 0;
+    skippedFrames++;
+    sSkipped.textContent = skippedFrames;
+    setStateLabel('MOTION', 'var(--warn)');
+    if (!isLocked) ctx.clearRect(0, 0, VW, VH);
+    // もう一度映像を描画（表示用）
+    ctx.drawImage(video, 0, 0, VW, VH);
+    updateChips();
+    requestAnimationFrame(scan);
+    return;
+  }
 
-            // ── 安定フレームカウント ──
-            stableCount++;
-            if (stableCount < CFG.STABLE_FRAMES) {
-                setStateLabel(`STABLE ${stableCount}/${CFG.STABLE_FRAMES}`, 'var(--accent)');
-                requestAnimationFrame(scan);
-                return;
-            }
+  // ── 安定フレームカウント ──
+  stableCount++;
+  if (stableCount < CFG.STABLE_FRAMES) {
+    setStateLabel(`STABLE ${stableCount}/${CFG.STABLE_FRAMES}`, 'var(--accent)');
+    requestAnimationFrame(scan);
+    return;
+  }
 
-            // ── QRスキャン実行（ROI領域のみ） ──
-            setStateLabel('SCAN', 'var(--success)');
+  // ── QRスキャン実行（ROI領域のみ） ──
+  setStateLabel('SCAN', 'var(--success)');
 
-            const t0 = performance.now();
-            const scanData = ctx.getImageData(roi.x, roi.y, roi.w, roi.h);
-            const code = jsQR(scanData.data, roi.w, roi.h, {
-                inversionAttempts: 'dontInvert'
-            });
-            const latency = Math.round(performance.now() - t0);
+  const t0 = performance.now();
+  const scanData = ctx.getImageData(roi.x, roi.y, roi.w, roi.h);
+  const code = jsQR(scanData.data, roi.w, roi.h, {
+    inversionAttempts: 'dontInvert'
+  });
+  const latency = Math.round(performance.now() - t0);
 
-            AI.recentLatency.push(latency);
-            sLatency.textContent = latency;
+  AI.recentLatency.push(latency);
+  sLatency.textContent = latency;
 
-            if (code) {
-                const now = performance.now();
-                const isDup = (code.data === lastCode) && (now - lastCodeTime < CFG.COOLDOWN_MS);
+  if (code) {
+    const now = performance.now();
+    const isDup = (code.data === lastCode) && (now - lastCodeTime < CFG.COOLDOWN_MS);
 
-                if (!isDup) {
-                    isLocked = true;
-                    lastCode = code.data;
-                    lastCodeTime = now;
-                    totalScans++;
-                    stableCount = 0;
-                    sTotal.textContent = totalScans;
+    if (!isDup) {
+      isLocked    = true;
+      lastCode    = code.data;
+      lastCodeTime= now;
+      totalScans++;
+      stableCount = 0;
+      sTotal.textContent = totalScans;
 
-                    drawBox(code.location, roi);
-                    showResult(code.data, latency);
-                    beep();
-                    if (navigator.vibrate) navigator.vibrate([50]);
+      drawBox(code.location, roi);
+      showResult(code.data, latency);
+      beep();
+      if (navigator.vibrate) navigator.vibrate([50]);
 
-                    setTimeout(() => {
-                        ctx.clearRect(0, 0, VW, VH);
-                        resetCorners();
-                        resultPanel.classList.remove('hit');
-                        isLocked = false;
-                    }, CFG.RESET_MS);
-                }
-            } else {
-                ctx.clearRect(0, 0, VW, VH);
-                ctx.drawImage(video, 0, 0, VW, VH);
-            }
+      setTimeout(() => {
+        ctx.clearRect(0, 0, VW, VH);
+        resetCorners();
+        resultPanel.classList.remove('hit');
+        isLocked = false;
+      }, CFG.RESET_MS);
+    }
+  } else {
+    ctx.clearRect(0, 0, VW, VH);
+    ctx.drawImage(video, 0, 0, VW, VH);
+  }
 
-            // ── AI適応チェック ──
-            if (AI.frameCount - AI.lastAdapt >= CFG.ADAPT_INTERVAL) {
-                AI.lastAdapt = AI.frameCount;
-                aiAdapt();
-            }
+  // ── AI適応チェック ──
+  if (AI.frameCount - AI.lastAdapt >= CFG.ADAPT_INTERVAL) {
+    AI.lastAdapt = AI.frameCount;
+    aiAdapt();
+  }
 
-            updateChips();
-            requestAnimationFrame(scan);
-        }
+  updateChips();
+  requestAnimationFrame(scan);
+}
 
-        function setStateLabel(text, color) {
-            stateLabel.textContent = text;
-            stateLabel.style.color = color || 'var(--muted)';
-        }
+function setStateLabel(text, color) {
+  stateLabel.textContent = text;
+  stateLabel.style.color = color || 'var(--muted)';
+}
 
-        // ════════════════════════════════════════════
-        //  🔊 ビープ音（Web Audio API）
-        // ════════════════════════════════════════════
-        let audioCtx = null;
+// ════════════════════════════════════════════
+//  🔊 ビープ音（Web Audio API）
+// ════════════════════════════════════════════
+let audioCtx = null;
 
-        function initAudio() {
-            if (!audioCtx) {
-                audioCtx = new (window.AudioContext || window.webkitAudioContext)();
-            }
-        }
+function initAudio() {
+  if (!audioCtx) {
+    audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+  }
+}
 
-        function beep() {
-            try {
-                initAudio();
-                if (audioCtx.state === 'suspended') audioCtx.resume();
+function beep() {
+  try {
+    initAudio();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
 
-                const now = audioCtx.currentTime;
+    const now = audioCtx.currentTime;
 
-                // メイン音：短くシャープなビープ
-                const osc = audioCtx.createOscillator();
-                const gain = audioCtx.createGain();
-                osc.connect(gain);
-                gain.connect(audioCtx.destination);
+    // メイン音：短くシャープなビープ
+    const osc = audioCtx.createOscillator();
+    const gain = audioCtx.createGain();
+    osc.connect(gain);
+    gain.connect(audioCtx.destination);
 
-                osc.type = 'square';
-                osc.frequency.setValueAtTime(1760, now);          // 高めのA6
-                osc.frequency.exponentialRampToValueAtTime(880, now + 0.06); // 半音下げ
+    osc.type = 'square';
+    osc.frequency.setValueAtTime(1760, now);          // 高めのA6
+    osc.frequency.exponentialRampToValueAtTime(880, now + 0.06); // 半音下げ
 
-                gain.gain.setValueAtTime(0.0, now);
-                gain.gain.linearRampToValueAtTime(0.25, now + 0.005); // アタック
-                gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12); // リリース
+    gain.gain.setValueAtTime(0.0, now);
+    gain.gain.linearRampToValueAtTime(0.25, now + 0.005); // アタック
+    gain.gain.exponentialRampToValueAtTime(0.001, now + 0.12); // リリース
 
-                osc.start(now);
-                osc.stop(now + 0.12);
+    osc.start(now);
+    osc.stop(now + 0.12);
 
-                // サブ音：低音でPOSっぽさを追加
-                const osc2 = audioCtx.createOscillator();
-                const gain2 = audioCtx.createGain();
-                osc2.connect(gain2);
-                gain2.connect(audioCtx.destination);
+    // サブ音：低音でPOSっぽさを追加
+    const osc2 = audioCtx.createOscillator();
+    const gain2 = audioCtx.createGain();
+    osc2.connect(gain2);
+    gain2.connect(audioCtx.destination);
 
-                osc2.type = 'sine';
-                osc2.frequency.setValueAtTime(440, now);
+    osc2.type = 'sine';
+    osc2.frequency.setValueAtTime(440, now);
 
-                gain2.gain.setValueAtTime(0.0, now);
-                gain2.gain.linearRampToValueAtTime(0.15, now + 0.005);
-                gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
+    gain2.gain.setValueAtTime(0.0, now);
+    gain2.gain.linearRampToValueAtTime(0.15, now + 0.005);
+    gain2.gain.exponentialRampToValueAtTime(0.001, now + 0.08);
 
-                osc2.start(now);
-                osc2.stop(now + 0.08);
+    osc2.start(now);
+    osc2.stop(now + 0.08);
 
-            } catch (e) {
-                console.warn('beep error:', e);
-            }
-        }
+  } catch(e) {
+    console.warn('beep error:', e);
+  }
+}
 
-        // iOSはユーザー操作でAudioContextを起こす必要があるため
-        // 最初のタップで初期化
-        document.addEventListener('touchstart', initAudio, { once: true });
-        document.addEventListener('click', initAudio, { once: true });
+// iOSはユーザー操作でAudioContextを起こす必要があるため
+// 最初のタップで初期化
+document.addEventListener('touchstart', initAudio, { once: true });
+document.addEventListener('click',      initAudio, { once: true });
 
-        // ════════════════════════════════════════════
-        //  初期化
-        // ════════════════════════════════════════════
-        video.addEventListener('loadeddata', () => {
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            updateROIVisual();
-            aiText.textContent = 'AI最適化エンジン 稼働開始 🚀';
-            requestAnimationFrame(scan);
-        });
+// ════════════════════════════════════════════
+//  初期化
+// ════════════════════════════════════════════
+video.addEventListener('loadeddata', () => {
+  canvas.width  = video.videoWidth;
+  canvas.height = video.videoHeight;
+  updateROIVisual();
+  aiText.textContent = 'AI最適化エンジン 稼働開始 🚀';
+  if (!scanLoopStarted) {
+    scanLoopStarted = true;
+    requestAnimationFrame(scan);
+  }
+});
 
-        clearBtn.addEventListener('click', () => {
-            history.length = 0;
-            historyList.innerHTML = '';
-            totalScans = 0; skippedFrames = 0; totalFrames = 0;
-            sTotal.textContent = '0';
-            sSkipped.textContent = '0';
-            skipRateEl.textContent = '0%';
-            resultValue.textContent = 'QRコードをかざしてください';
-            resultMeta.textContent = '';
-            resultPanel.classList.remove('hit');
-        });
+// 起動シーケンス：カメラ一覧取得 → デフォルト起動
+(async () => {
+  await loadCameraList();
+  await startCamera(cameraSelect.value);
+})();
 
-        startCamera();
-    </script>
+clearBtn.addEventListener('click', () => {
+  history.length = 0;
+  historyList.innerHTML = '';
+  totalScans = 0; skippedFrames = 0; totalFrames = 0;
+  sTotal.textContent = '0';
+  sSkipped.textContent = '0';
+  skipRateEl.textContent = '0%';
+  resultValue.textContent = 'QRコードをかざしてください';
+  resultMeta.textContent = '';
+  resultPanel.classList.remove('hit');
+});
+
+</script>
 </body>
-
 </html>

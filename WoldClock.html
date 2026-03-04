@@ -7,16 +7,22 @@
     <script src="https://d3js.org/d3.v7.min.js"></script>
     <script src="https://unpkg.com/topojson-client@3"></script>
     <link rel="Stylesheet" href="WoldClock.css">
+    <link rel="Stylesheet" href="LocationBubble.css">
+    <link rel="stylesheet" href="LocationBubble_settings.css">
+    <script src="LocationBubble.js"></script>
 </head>
 
 <body>
     <svg></svg>
+
     <div id="TopContainer">
         <div id="CountryView">---</div>
+
         <div id="TimezoneDropdown">
             <input id="TimezoneSearch" type="text" placeholder="検索 / Search..." autocomplete="off">
             <ul id="TimezoneList"></ul>
         </div>
+
         <div id="DateView">---</div>
         <div id="TimeView">00:00:00</div>
     </div>
@@ -30,8 +36,12 @@
             <span id="SettingsTrayTitle">設定</span>
             <button id="SettingsTrayClose">✕</button>
         </div>
+
         <div id="SettingsTrayContent">
-            <span><input id="DateViewSetting" type="checkbox">日付を表示</span>
+            <label>
+                <input id="DateViewSetting" type="checkbox">
+                日付を表示
+            </label>
         </div>
     </div>
 

@@ -1,0 +1,126 @@
+html,
+body {
+    margin: 0;
+    background: white;
+    overflow: hidden;
+    height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+svg {
+    display: block;
+    margin: 0 auto;
+}
+
+#CountryView {
+    position: absolute;
+    top: 32%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 3rem;
+    font-family: 'Noto Sans JP', sans-serif;
+    color: #000;
+    background: rgba(252, 249, 249, 0.566);
+    padding: 0.2em 0.5em;
+    cursor: pointer;
+    user-select: none;
+    white-space: nowrap;
+}
+
+#CountryView:hover {
+    background: rgba(240, 230, 245, 0.8);
+}
+
+#TimeView {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    font-size: 5rem;
+    font-family: 'Noto Sans JP', sans-serif;
+    color: #000;
+    background: rgba(252, 249, 249, 0.566);
+    padding: 0.2em 0.5em;
+}
+
+/* ── タイムゾーン選択ドロップダウン ── */
+#TimezoneDropdown {
+    display: none;
+    position: absolute;
+    top: calc(32% + 2.5rem);
+    left: 50%;
+    transform: translateX(-50%);
+    background: rgba(255, 255, 255, 0.97);
+    border: 1.5px solid #d0b8e0;
+    border-radius: 10px;
+    box-shadow: 0 8px 32px rgba(180, 100, 200, 0.18);
+    z-index: 1000;
+    min-width: 320px;
+    max-width: 420px;
+    overflow: hidden;
+    font-family: 'Noto Sans JP', sans-serif;
+}
+
+#TimezoneDropdown.open {
+    display: block;
+}
+
+#TimezoneSearch {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 0.6em 1em;
+    font-size: 1.1rem;
+    font-family: 'Noto Sans JP', sans-serif;
+    border: none;
+    border-bottom: 1.5px solid #e8d5f5;
+    outline: none;
+    background: #faf6ff;
+    color: #333;
+}
+
+#TimezoneSearch::placeholder {
+    color: #bba8cc;
+}
+
+#TimezoneList {
+    max-height: 260px;
+    overflow-y: auto;
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+#TimezoneList li {
+    padding: 0.55em 1.1em;
+    cursor: pointer;
+    font-size: 1rem;
+    color: #333;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid #f3eafc;
+    transition: background 0.1s;
+}
+
+#TimezoneList li:last-child {
+    border-bottom: none;
+}
+
+#TimezoneList li:hover {
+    background: #f5eaff;
+}
+
+#TimezoneList li.selected {
+    background: #ede0ff;
+    font-weight: bold;
+    color: #7b3fa8;
+}
+
+#TimezoneList li .tz-alpha3 {
+    font-size: 0.85em;
+    color: #aa7acc;
+    margin-left: 1em;
+    flex-shrink: 0;
+}

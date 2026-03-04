@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html lang="ja">
+
+<head>
+    <meta charset="UTF-8">
+    <title>WorldClock</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://unpkg.com/topojson-client@3"></script>
+    <link rel="Stylesheet" href="WoldClock.css">
+</head>
+
+<body>
+    <svg></svg>
+    <div id="TopContainer">
+        <div id="CountryView">---</div>
+        <div id="TimezoneDropdown">
+            <input id="TimezoneSearch" type="text" placeholder="検索 / Search..." autocomplete="off">
+            <ul id="TimezoneList"></ul>
+        </div>
+        <div id="TimeView">00:00:00</div>
+    </div>
+
+    <script src="WoldClockGlobe.js"></script>
+    <script src="WoldClock.js"></script>
+</body>
+
+</html>
